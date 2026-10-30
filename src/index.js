@@ -9,6 +9,7 @@ import { createAuth, loadAuthEnvironment } from "./auth.js";
 loadAuthEnvironment();
 const auth = createAuth({
 	password: process.env.PROXY_PASSWORD,
+	publicOrigin: process.env.PUBLIC_ORIGIN,
 	secure: process.env.AUTH_COOKIE_SECURE === "true",
 });
 

@@ -124,3 +124,66 @@ test("secure cookies and expired sessions", async (t) => {
 	await new Promise((resolve) => setTimeout(resolve, 60));
 	assert.equal((await request("/", { headers: { cookie } })).status, 303);
 });
+
+test("public HTTPS origin supports rewritten proxy Host and secures cookies", async (t) => {
+	const origin = "https://proxy.example.com:8443";
+	const { auth, request, host } = await fixture(t, { publicOrigin: origin });
+	const headers = {
+		origin,
+		"content-type": "application/x-www-form-urlencoded",
+	};
+	const wrong = await request("/auth/login", {
+		method: "POST",
+		headers,
+		body: "password=wrong",
+	});
+	assert.equal(wrong.status, 401);
+	const response = await request("/auth/login", {
+		method: "POST",
+		headers,
+		body: "password=test-secret",
+	});
+	assert.equal(response.status, 303);
+	assert.match(response.headers.get("set-cookie"), /; Secure/);
+	const cookie = response.headers.get("set-cookie").split(";")[0];
+	const socket = new EventEmitter();
+	socket.destroy = () => {};
+	socket.end = () => {};
+	assert.equal(
+		auth.upgrade({ headers: { origin, host, cookie } }, socket),
+		true
+	);
+	for (const invalid of [
+		"https://attacker.invalid",
+		"http://proxy.example.com:8443",
+		"https://proxy.example.com",
+	]) {
+		assert.equal(
+			auth.upgrade({ headers: { origin: invalid, host, cookie } }, socket),
+			false
+		);
+		assert.equal(
+			(
+				await request("/auth/logout", {
+					method: "POST",
+					headers: {
+						origin: invalid,
+						cookie,
+						"x-forwarded-host": "proxy.example.com:8443",
+						"x-forwarded-proto": "https",
+					},
+				})
+			).status,
+			403
+		);
+	}
+	assert.equal(
+		(
+			await request("/auth/logout", {
+				method: "POST",
+				headers: { origin, cookie },
+			})
+		).status,
+		303
+	);
+});

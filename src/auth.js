@@ -11,9 +11,29 @@ export function loadAuthEnvironment() {
 
 export function createAuth({
 	password,
+	publicOrigin,
 	secure = false,
 	lifetime = 8 * 60 * 60 * 1000,
 }) {
+	let origin;
+	if (publicOrigin) {
+		const url = new URL(publicOrigin);
+		if (
+			!["http:", "https:"].includes(url.protocol) ||
+			url.username ||
+			url.password ||
+			url.pathname !== "/" ||
+			url.search ||
+			url.hash
+		)
+			throw new Error(
+				"PUBLIC_ORIGIN must be an HTTP(S) origin without a path, credentials, query, or fragment."
+			);
+		origin = url.origin;
+		if (url.protocol === "https:") secure = true;
+	}
+	const expectedOrigin = (req) =>
+		origin || `${secure ? "https" : "http"}://${req.headers.host}`;
 	if (!password || !password.trim())
 		throw new Error(
 			"Set PROXY_PASSWORD in the environment or .env before starting the server."
@@ -77,11 +97,13 @@ export function createAuth({
 		) {
 			if (
 				req.headers["sec-fetch-site"] === "cross-site" ||
-				(req.headers.origin &&
-					req.headers.origin !==
-						`${secure ? "https" : "http"}://${req.headers.host}`)
+				(req.headers.origin && req.headers.origin !== expectedOrigin(req))
 			) {
-				send(res, 403, "Forbidden");
+				send(
+					res,
+					403,
+					"Forbidden: request origin does not match this service. Configure PUBLIC_ORIGIN to match the browser address (scheme, hostname, and port)."
+				);
 				return true;
 			}
 			if (path === "/auth/logout") {
@@ -159,11 +181,7 @@ export function createAuth({
 	function upgrade(req, socket) {
 		const current = session(req);
 		// Browser WebSockets must originate from this application.
-		if (
-			!current ||
-			req.headers.origin !==
-				`${secure ? "https" : "http"}://${req.headers.host}`
-		) {
+		if (!current || req.headers.origin !== expectedOrigin(req)) {
 			socket.end(
 				"HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n"
 			);

@@ -97,3 +97,17 @@ Docker Compose reads `PROXY_PASSWORD` and `AUTH_COOKIE_SECURE` from your shell o
 excluded from the Docker build context.
 
 Run the authentication regression tests with `npm test`.
+
+### Reverse proxy origin configuration
+
+When deployed behind a reverse proxy, set `PUBLIC_ORIGIN` to the exact public
+origin shown in your browser, for example `https://proxy.example.com` or
+`https://proxy.example.com:8443`. Do not include a path. This is used to validate
+login, logout, and WebSocket origins even if the proxy rewrites the Host header.
+An HTTPS `PUBLIC_ORIGIN` automatically enables Secure session cookies.
+Forwarded headers are not trusted for origin validation.
+
+After changing `.env`, recreate the container with
+`docker compose up -d --build --force-recreate`. A plain container restart does
+not reload Compose environment settings. Local HTTP development can leave
+`PUBLIC_ORIGIN` empty and `AUTH_COOKIE_SECURE=false`.

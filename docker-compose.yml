@@ -8,5 +8,6 @@ services:
       PORT: 8080
       PROXY_PASSWORD: ${PROXY_PASSWORD:?Set PROXY_PASSWORD in .env or the environment}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
     ports:
       - "8080:8080"
