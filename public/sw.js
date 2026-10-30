@@ -12,5 +12,10 @@ async function handleRequest(event) {
 }
 
 self.addEventListener("fetch", (event) => {
+	// Let authentication navigations reach the server directly, even when
+	// proxy initialization is pending or the session has just been revoked.
+	const url = new URL(event.request.url);
+	if (url.origin === self.location.origin && url.pathname.startsWith("/auth/"))
+		return;
 	event.respondWith(handleRequest(event));
 });

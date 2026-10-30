@@ -25,7 +25,7 @@ Ensure you are not hosting on a datacenter IP for CAPTCHAs to work reliably alon
 
 ## Setup / Usage
 
-You will need Node.js 16.x (and above) and Git installed; below is an example for Debian/Ubuntu setup.
+You will need Node.js 22.15+ and Git installed; below is an example for Debian/Ubuntu setup.
 
 ```
 sudo apt update
@@ -37,8 +37,8 @@ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-nvm install 20
-nvm use 20
+nvm install 22
+nvm use 22
 
 git clone https://github.com/MercuryWorkshop/Scramjet-App
 cd Scramjet-App
@@ -72,3 +72,28 @@ You may also want to use [epoxy-transport](https://github.com/MercuryWorkshop/ep
 This example also now uses [wisp-js/server](https://www.npmjs.com/package/@mercuryworkshop/wisp-js) instead of the now outdated wisp-server-node. Please note that this can also be replaced with other wisp implementations like [wisp-server-python](https://github.com/MercuryWorkshop/wisp-server-python) which is highly recommended for production.
 
 See the [bare-mux](https://github.com/MercuryWorkshop/bare-mux) documentation for more information.
+
+### Password protection
+
+Node.js 22.15+ is required. Copy `.env.example` to `.env` and set
+`PROXY_PASSWORD` to a long, unique password before running `pnpm start`.
+Alternatively, supply `PROXY_PASSWORD` as an environment variable; environment
+variables take precedence over `.env`. The server refuses to start without it.
+
+Open the app and sign in. All HTTP assets and the Wisp WebSocket endpoint require
+a session. Sessions expire after eight hours; logout closes the session's active
+proxy connections. Restarting the server invalidates all sessions, so restart
+after changing the password. Sessions are stored in memory: use a single instance
+or sticky routing if deploying multiple instances.
+
+For public deployment, terminate HTTPS at your reverse proxy and set
+`AUTH_COOKIE_SECURE=true`. Forward the original Host header and WebSocket upgrades.
+Do not expose another unprotected Wisp server. Login is limited to ten attempts
+per 15 minutes per connecting IP; clients behind a reverse proxy share its limit.
+Forwarded IP headers are deliberately not trusted.
+
+Docker Compose reads `PROXY_PASSWORD` and `AUTH_COOKIE_SECURE` from your shell or
+`.env`. Run `docker compose up --build -d` after configuring them. Secrets are
+excluded from the Docker build context.
+
+Run the authentication regression tests with `npm test`.

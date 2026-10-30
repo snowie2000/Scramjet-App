@@ -4,6 +4,13 @@ import { hostname } from "node:os";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
+import { createAuth, loadAuthEnvironment } from "./auth.js";
+
+loadAuthEnvironment();
+const auth = createAuth({
+	password: process.env.PROXY_PASSWORD,
+	secure: process.env.AUTH_COOKIE_SECURE === "true",
+});
 
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
 import { libcurlPath } from "@mercuryworkshop/libcurl-transport";
@@ -23,13 +30,19 @@ Object.assign(wisp.options, {
 const fastify = Fastify({
 	serverFactory: (handler) => {
 		return createServer()
-			.on("request", (req, res) => {
+			.on("request", async (req, res) => {
 				res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
 				res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
-				handler(req, res);
+				try {
+					if (!(await auth.handle(req, res))) handler(req, res);
+				} catch {
+					if (!res.headersSent) res.writeHead(400);
+					res.end();
+				}
 			})
 			.on("upgrade", (req, socket, head) => {
-				if (req.url.endsWith("/wisp/")) wisp.routeRequest(req, socket, head);
+				if (!auth.upgrade(req, socket)) return;
+				if (req.url === "/wisp/") wisp.routeRequest(req, socket, head);
 				else socket.end();
 			});
 	},
@@ -37,24 +50,28 @@ const fastify = Fastify({
 
 fastify.register(fastifyStatic, {
 	root: publicPath,
+	cacheControl: false,
 	decorateReply: true,
 });
 
 fastify.register(fastifyStatic, {
 	root: scramjetPath,
 	prefix: "/scram/",
+	cacheControl: false,
 	decorateReply: false,
 });
 
 fastify.register(fastifyStatic, {
 	root: libcurlPath,
 	prefix: "/libcurl/",
+	cacheControl: false,
 	decorateReply: false,
 });
 
 fastify.register(fastifyStatic, {
 	root: baremuxPath,
 	prefix: "/baremux/",
+	cacheControl: false,
 	decorateReply: false,
 });
 

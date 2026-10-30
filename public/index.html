@@ -9,10 +9,10 @@
 		<title>Scramjet</title>
 
 		<link rel="shortcut icon" content="favicon.webp" />
-	
+
 		<script src="/scram/scramjet.all.js"></script>
 		<script src="/baremux/index.js"></script>
-		
+
 		<link rel="stylesheet" href="index.css" />
 		<script src="register-sw.js" defer></script>
 		<script src="search.js" defer></script>
@@ -57,6 +57,9 @@
 					>GitHub</a
 				>
 				<a title="License information" href="credits.html">Credits</a>
+				<form class="sign-out" method="post" action="/auth/logout">
+					<button type="submit">Sign out</button>
+				</form>
 			</div>
 			<div>
 				<span>Scramjet &copy; MW 2025</span>

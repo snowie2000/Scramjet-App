@@ -91,6 +91,31 @@ footer a:hover {
 	text-decoration: underline;
 }
 
+footer .sign-out {
+	margin: 0 15px;
+}
+
+footer .sign-out button {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #fff;
+	font: inherit;
+	font-size: 15px;
+	line-height: inherit;
+	cursor: pointer;
+}
+
+footer .sign-out button:hover {
+	text-decoration: underline;
+}
+
+footer .sign-out button:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 5px;
+	border-radius: 2px;
+}
+
 .desc p {
 	width: 560px;
 	color: rgba(253, 253, 253, 0.514);
