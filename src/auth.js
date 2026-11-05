@@ -43,6 +43,19 @@ export function createAuth({
 	const sessions = new Map();
 	const attempts = new Map();
 	const cookieName = "scramjet_session";
+	// Scramjet's service worker outlives an authentication session. When it is
+	// revived, it must be able to reload these static runtime files before any
+	// page can ask the user to sign in again. Protecting them with a redirect
+	// causes the login HTML to be consumed as the rewriter WASM and leaves the
+	// worker broken until all browser storage is cleared.
+	function isPublicRuntimePath(path) {
+		return (
+			path === "/sw.js" ||
+			path.startsWith("/scram/") ||
+			path.startsWith("/baremux/") ||
+			path.startsWith("/libcurl/")
+		);
+	}
 	function revoke(token) {
 		const session = sessions.get(token);
 		if (!session) return;
@@ -87,6 +100,13 @@ export function createAuth({
 	}
 	async function handle(req, res) {
 		const path = new URL(req.url, "http://localhost").pathname;
+		if (
+			(req.method === "GET" || req.method === "HEAD") &&
+			isPublicRuntimePath(path)
+		) {
+			res.setHeader("Cache-Control", "no-store");
+			return false;
+		}
 		if (path === "/auth/login" && req.method === "GET") {
 			login(res);
 			return true;

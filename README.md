@@ -80,11 +80,14 @@ Node.js 22.15+ is required. Copy `.env.example` to `.env` and set
 Alternatively, supply `PROXY_PASSWORD` as an environment variable; environment
 variables take precedence over `.env`. The server refuses to start without it.
 
-Open the app and sign in. All HTTP assets and the Wisp WebSocket endpoint require
-a session. Sessions expire after eight hours; logout closes the session's active
-proxy connections. Restarting the server invalidates all sessions, so restart
-after changing the password. Sessions are stored in memory: use a single instance
-or sticky routing if deploying multiple instances.
+Open the app and sign in. Application pages, proxied traffic, and the Wisp
+WebSocket endpoint require a session. Static Scramjet, BareMux, and libcurl
+runtime files remain public because an installed service worker must be able to
+reload them after a session expires; they cannot proxy traffic without the
+authenticated Wisp endpoint. Sessions expire after eight hours; logout closes
+the session's active proxy connections. Restarting the server invalidates all
+sessions, so restart after changing the password. Sessions are stored in memory:
+use a single instance or sticky routing if deploying multiple instances.
 
 For public deployment, terminate HTTPS at your reverse proxy and set
 `AUTH_COOKIE_SECURE=true`. Forward the original Host header and WebSocket upgrades.

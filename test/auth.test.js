@@ -28,20 +28,27 @@ test("missing password fails closed", () => {
 	assert.throws(() => createAuth({ password: "  " }), /PROXY_PASSWORD/);
 });
 
-test("all HTTP routes require a session; login, cookie flags, logout and WebSocket revocation", async (t) => {
+test("pages require a session while static proxy runtime remains available", async (t) => {
 	const { auth, request, login, host, base } = await fixture(t);
-	for (const path of [
-		"/",
-		"/index.html",
-		"/sw.js",
-		"/scram/scramjet.all.js",
-		"/libcurl/index.mjs",
-		"/baremux/worker.js",
-		"/wisp/",
-		"/missing",
-	]) {
+	for (const path of ["/", "/index.html", "/wisp/", "/missing"]) {
 		assert.equal((await request(path)).status, 303);
 	}
+	for (const path of [
+		"/sw.js",
+		"/scram/scramjet.all.js",
+		"/scram/scramjet.wasm.wasm",
+		"/libcurl/index.mjs",
+		"/baremux/worker.js",
+	]) {
+		const response = await request(path);
+		assert.equal(response.status, 200);
+		assert.equal(await response.text(), "protected");
+		assert.equal(response.headers.get("cache-control"), "no-store");
+	}
+	assert.equal(
+		(await request("/scram/scramjet.wasm.wasm", { method: "POST" })).status,
+		303
+	);
 	assert.equal((await request("/auth/login")).status, 200);
 	assert.equal((await login("wrong")).status, 401);
 	const response = await login();
@@ -123,6 +130,11 @@ test("secure cookies and expired sessions", async (t) => {
 	const cookie = response.headers.get("set-cookie").split(";")[0];
 	await new Promise((resolve) => setTimeout(resolve, 60));
 	assert.equal((await request("/", { headers: { cookie } })).status, 303);
+	const wasm = await request("/scram/scramjet.wasm.wasm", {
+		headers: { cookie },
+	});
+	assert.equal(wasm.status, 200);
+	assert.equal(await wasm.text(), "protected");
 });
 
 test("public HTTPS origin supports rewritten proxy Host and secures cookies", async (t) => {
