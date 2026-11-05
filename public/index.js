@@ -74,6 +74,45 @@ function startAndAnnounce() {
 	return startProxy().then(() => announceProxyReady());
 }
 
+let activeFrame;
+
+function urlFromAddressBar() {
+	if (!location.hash.startsWith("#")) return null;
+	try {
+		return decodeURIComponent(location.hash.slice(1)) || null;
+	} catch {
+		return null;
+	}
+}
+
+function addressBarUrl(url) {
+	return `#${encodeURIComponent(url)}`;
+}
+
+function updateBrowserHistory(url, replace = false) {
+	address.value = url;
+	if (urlFromAddressBar() === url) return;
+	const method = replace ? "replaceState" : "pushState";
+	history[method]({ scramjetUrl: url }, "", addressBarUrl(url));
+}
+
+function getFrame() {
+	if (activeFrame) return activeFrame;
+	activeFrame = scramjet.createFrame();
+	activeFrame.frame.id = "sj-frame";
+	activeFrame.addEventListener("urlchange", (event) => {
+		updateBrowserHistory(event.url.toString());
+	});
+	document.body.appendChild(activeFrame.frame);
+	return activeFrame;
+}
+
+function closeFrame() {
+	if (!activeFrame) return;
+	activeFrame.frame.remove();
+	activeFrame = undefined;
+}
+
 navigator.serviceWorker.addEventListener("message", (event) => {
 	if (event.data?.type !== "scramjet-app:request-ready") return;
 	startAndAnnounce().catch(showStartupError);
@@ -83,6 +122,30 @@ navigator.serviceWorker.addEventListener("message", (event) => {
 // cannot create a SharedWorker itself, so it must not receive a proxied request
 // before this page has created and configured BareMux.
 startAndAnnounce().catch(showStartupError);
+
+window.addEventListener("popstate", (event) => {
+	const url = event.state?.scramjetUrl || urlFromAddressBar();
+	if (!url) {
+		closeFrame();
+		return;
+	}
+	startAndAnnounce()
+		.then(() => getFrame().go(url))
+		.catch(showStartupError);
+});
+
+const restoredUrl = urlFromAddressBar();
+if (restoredUrl) {
+	history.replaceState(
+		{ scramjetUrl: restoredUrl },
+		"",
+		addressBarUrl(restoredUrl)
+	);
+	address.value = restoredUrl;
+	startAndAnnounce()
+		.then(() => getFrame().go(restoredUrl))
+		.catch(showStartupError);
+}
 
 form.addEventListener("submit", async (event) => {
 	event.preventDefault();
@@ -95,8 +158,6 @@ form.addEventListener("submit", async (event) => {
 	}
 
 	const url = search(address.value, searchEngine.value);
-	const frame = scramjet.createFrame();
-	frame.frame.id = "sj-frame";
-	document.body.appendChild(frame.frame);
-	frame.go(url);
+	updateBrowserHistory(url);
+	getFrame().go(url);
 });

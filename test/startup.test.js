@@ -7,6 +7,26 @@ test("controller eagerly starts in order and announces transport readiness", asy
 	const calls = [];
 	let onSubmit;
 	let onWorkerMessage;
+	let onPopState;
+	let onUrlChange;
+	const location = {
+		protocol: "https:",
+		host: "proxy.test",
+		hash: "",
+	};
+	const history = {
+		state: null,
+		pushState(state, _unused, url) {
+			this.state = state;
+			location.hash = url;
+			calls.push(`pushState:${url}`);
+		},
+		replaceState(state, _unused, url) {
+			this.state = state;
+			location.hash = url;
+			calls.push(`replaceState:${url}`);
+		},
+	};
 	const elements = {
 		"sj-form": {
 			addEventListener(type, listener) {
@@ -23,7 +43,13 @@ test("controller eagerly starts in order and announces transport readiness", asy
 		"utf8"
 	);
 	runInNewContext(source, {
-		location: { protocol: "https:", host: "proxy.test" },
+		location,
+		history,
+		window: {
+			addEventListener(type, listener) {
+				if (type === "popstate") onPopState = listener;
+			},
+		},
 		navigator: {
 			serviceWorker: {
 				controller: {
@@ -54,9 +80,16 @@ test("controller eagerly starts in order and announces transport readiness", asy
 				createFrame() {
 					calls.push("createFrame");
 					return {
-						frame: {},
-						go() {
-							calls.push("go");
+						frame: {
+							remove() {
+								calls.push("remove");
+							},
+						},
+						addEventListener(type, listener) {
+							if (type === "urlchange") onUrlChange = listener;
+						},
+						go(url) {
+							calls.push(`go:${url}`);
 						},
 					};
 				}
@@ -88,9 +121,32 @@ test("controller eagerly starts in order and announces transport readiness", asy
 	await onSubmit({ preventDefault() {} });
 	assert.deepEqual(calls, [
 		"postMessage:scramjet-app:ready",
+		"pushState:#https%3A%2F%2Fexample.com%2F",
 		"createFrame",
 		"append",
-		"go",
+		"go:https://example.com/",
+	]);
+
+	calls.length = 0;
+	onUrlChange({ url: new URL("https://example.com/next") });
+	assert.deepEqual(calls, [
+		"pushState:#https%3A%2F%2Fexample.com%2Fnext",
+	]);
+
+	calls.length = 0;
+	location.hash = "";
+	onPopState({ state: null });
+	assert.deepEqual(calls, ["remove"]);
+
+	calls.length = 0;
+	location.hash = "#https%3A%2F%2Fexample.com%2Fnext";
+	onPopState({ state: { scramjetUrl: "https://example.com/next" } });
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.deepEqual(calls, [
+		"postMessage:scramjet-app:ready",
+		"createFrame",
+		"append",
+		"go:https://example.com/next",
 	]);
 
 	calls.length = 0;
