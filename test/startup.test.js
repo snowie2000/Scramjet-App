@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 
-test("proxy startup selects a transport before registering and initializing the worker", async () => {
+test("controller eagerly starts in order and announces transport readiness", async () => {
 	const calls = [];
 	let onSubmit;
+	let onWorkerMessage;
 	const elements = {
 		"sj-form": {
 			addEventListener(type, listener) {
@@ -23,6 +24,18 @@ test("proxy startup selects a transport before registering and initializing the 
 	);
 	runInNewContext(source, {
 		location: { protocol: "https:", host: "proxy.test" },
+		navigator: {
+			serviceWorker: {
+				controller: {
+					postMessage(message) {
+						calls.push(`postMessage:${message.type}`);
+					},
+				},
+				addEventListener(type, listener) {
+					if (type === "message") onWorkerMessage = listener;
+				},
+			},
+		},
 		document: {
 			getElementById(id) {
 				return elements[id];
@@ -64,16 +77,26 @@ test("proxy startup selects a transport before registering and initializing the 
 		},
 	});
 
-	assert.deepEqual(calls, []);
-	await onSubmit({ preventDefault() {} });
+	await new Promise((resolve) => setImmediate(resolve));
 	assert.deepEqual(calls, [
 		"setTransport:/libcurl-reliable.mjs",
 		"registerSW",
 		"scramjet.init",
+		"postMessage:scramjet-app:ready",
+	]);
+	calls.length = 0;
+	await onSubmit({ preventDefault() {} });
+	assert.deepEqual(calls, [
+		"postMessage:scramjet-app:ready",
 		"createFrame",
 		"append",
 		"go",
 	]);
+
+	calls.length = 0;
+	onWorkerMessage({ data: { type: "scramjet-app:request-ready" } });
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.deepEqual(calls, ["postMessage:scramjet-app:ready"]);
 });
 
 test("libcurl wrapper retries only its transient first-load WASM race", async () => {

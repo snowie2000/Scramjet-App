@@ -59,14 +59,38 @@ function startProxy() {
 	return startupPromise;
 }
 
+function announceProxyReady() {
+	const worker = navigator.serviceWorker.controller;
+	if (!worker) throw new Error("No controlling service worker is available.");
+	worker.postMessage({ type: "scramjet-app:ready" });
+}
+
+function showStartupError(err) {
+	error.textContent = "Failed to initialize proxy.";
+	errorCode.textContent = err.toString();
+}
+
+function startAndAnnounce() {
+	return startProxy().then(() => announceProxyReady());
+}
+
+navigator.serviceWorker.addEventListener("message", (event) => {
+	if (event.data?.type !== "scramjet-app:request-ready") return;
+	startAndAnnounce().catch(showStartupError);
+});
+
+// Initialize as soon as the controller page loads. Scramjet's service worker
+// cannot create a SharedWorker itself, so it must not receive a proxied request
+// before this page has created and configured BareMux.
+startAndAnnounce().catch(showStartupError);
+
 form.addEventListener("submit", async (event) => {
 	event.preventDefault();
 
 	try {
-		await startProxy();
+		await startAndAnnounce();
 	} catch (err) {
-		error.textContent = "Failed to initialize proxy.";
-		errorCode.textContent = err.toString();
+		showStartupError(err);
 		throw err;
 	}
 
