@@ -35,6 +35,7 @@ test("pages require a session while static proxy runtime remains available", asy
 	}
 	for (const path of [
 		"/sw.js",
+		"/libcurl-reliable.mjs",
 		"/scram/scramjet.all.js",
 		"/scram/scramjet.wasm.wasm",
 		"/libcurl/index.mjs",

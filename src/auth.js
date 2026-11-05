@@ -51,6 +51,7 @@ export function createAuth({
 	function isPublicRuntimePath(path) {
 		return (
 			path === "/sw.js" ||
+			path === "/libcurl-reliable.mjs" ||
 			path.startsWith("/scram/") ||
 			path.startsWith("/baremux/") ||
 			path.startsWith("/libcurl/")
